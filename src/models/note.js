@@ -14,10 +14,12 @@ const noteSchema = new Schema(
       default: '',
       trim: true,
     },
+
     tag: {
       type: String,
       enum: TAGS,
       default: 'Todo',
+      index: true,
     },
   },
   {
@@ -26,7 +28,6 @@ const noteSchema = new Schema(
   },
 );
 
-// Створюємо текстовий індекс для пошуку по title та content
 noteSchema.index({ title: 'text', content: 'text' });
 
 export const Note = model('Note', noteSchema);
