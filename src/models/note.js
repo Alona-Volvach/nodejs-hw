@@ -21,6 +21,12 @@ const noteSchema = new Schema(
       default: 'Todo',
       index: true,
     },
+
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
   },
   {
     timestamps: true,
@@ -28,6 +34,7 @@ const noteSchema = new Schema(
   },
 );
 
+// Створюємо текстовий індекс для пошуку по title та content
 noteSchema.index({ title: 'text', content: 'text' });
 
 export const Note = model('Note', noteSchema);

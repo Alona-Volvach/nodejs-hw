@@ -51,19 +51,21 @@ export const loginUser = async (req, res, next) => {
 
 export const logoutUser = async (req, res) => {
   const { sessionId } = req.cookies;
+
   if (sessionId) {
     await Session.deleteOne({ _id: sessionId });
   }
 
+  res.clearCookie('sessionId');
   res.clearCookie('accessToken');
   res.clearCookie('refreshToken');
-  res.clearCookie('sessionId');
 
   res.status(204).end();
 };
 
 export const refreshUserSession = async (req, res, next) => {
   const { sessionId, refreshToken } = req.cookies;
+
   const session = await Session.findOne({
     _id: sessionId,
     refreshToken,
@@ -74,20 +76,41 @@ export const refreshUserSession = async (req, res, next) => {
     return;
   }
 
-  const userId = session.userId;
+  const isRefreshTokenExpired =
+    new Date() > session.refreshTokenValidUntil;
 
-  const isRefresheTokenExpired = new Date() > session.refreshTokenValidUntil;
+  if (isRefreshTokenExpired) {
+    // Видаляємо стару сесію
+    await Session.deleteOne({
+      _id: sessionId,
+      refreshToken,
+    });
 
-  if (isRefresheTokenExpired) {
-    next(createHttpError(401, 'Session token expired'));
+    // Очищаємо cookies
+    res.clearCookie('sessionId');
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+
+    // Повертаємо 401
+    res.status(401).json({
+      message: 'Refresh token expired',
+    });
+
     return;
   }
 
-  await Session.deleteOne({ _id: sessionId, refreshToken });
+  const userId = session.userId;
+
+  await Session.deleteOne({
+    _id: sessionId,
+    refreshToken,
+  });
 
   const newSession = await createSession(userId);
 
   setSessionCookies(res, newSession);
 
-  res.status(200).json({ message: 'Session refreshed' });
+  res.status(200).json({
+    message: 'Session refreshed',
+  });
 };
