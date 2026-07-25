@@ -79,25 +79,18 @@ export const refreshUserSession = async (req, res, next) => {
   const isRefreshTokenExpired =
     new Date() > session.refreshTokenValidUntil;
 
-  if (isRefreshTokenExpired) {
-    // Видаляємо стару сесію
-    await Session.deleteOne({
-      _id: sessionId,
-      refreshToken,
-    });
+ if (isRefreshTokenExpired) {
+  await Session.deleteOne({
+    _id: sessionId,
+    refreshToken,
+  });
 
-    // Очищаємо cookies
-    res.clearCookie('sessionId');
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+  res.clearCookie('sessionId');
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken');
 
-    // Повертаємо 401
-    res.status(401).json({
-      message: 'Refresh token expired',
-    });
-
-    return;
-  }
+  return next(createHttpError(401, 'Refresh token expired'));
+}
 
   const userId = session.userId;
 
