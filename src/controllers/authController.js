@@ -9,7 +9,6 @@ import fs from 'node:fs/promises';
 import jwt from 'jsonwebtoken';
 import { sendEmail } from '../utils/sendMail.js';
 
-
 export const registerUser = async (req, res, next) => {
   const { email, password } = req.body;
 
@@ -22,7 +21,11 @@ export const registerUser = async (req, res, next) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const newUser = await User.create({ email, password: hashedPassword });
+  const newUser = await User.create({
+    email,
+    password: hashedPassword,
+  });
+
   const newSession = await createSession(newUser._id);
 
   setSessionCookies(res, newSession);
@@ -32,6 +35,7 @@ export const registerUser = async (req, res, next) => {
 
 export const loginUser = async (req, res, next) => {
   const { email, password } = req.body;
+
   const user = await User.findOne({ email });
 
   if (!user) {
@@ -57,6 +61,7 @@ export const loginUser = async (req, res, next) => {
 
 export const logoutUser = async (req, res) => {
   const { sessionId } = req.cookies;
+
   if (sessionId) {
     await Session.deleteOne({ _id: sessionId });
   }
@@ -70,6 +75,7 @@ export const logoutUser = async (req, res) => {
 
 export const refreshUserSession = async (req, res, next) => {
   const { sessionId, refreshToken } = req.cookies;
+
   const session = await Session.findOne({
     _id: sessionId,
     refreshToken,
@@ -82,23 +88,35 @@ export const refreshUserSession = async (req, res, next) => {
 
   const userId = session.userId;
 
-  const isRefresheTokenExpired = new Date() > session.refreshTokenValidUntil;
+  const isRefreshTokenExpired =
+    new Date() > session.refreshTokenValidUntil;
 
-  if (isRefresheTokenExpired) {
+  if (isRefreshTokenExpired) {
+    await Session.deleteOne({ _id: sessionId });
+
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    res.clearCookie('sessionId');
+
     next(createHttpError(401, 'Session token expired'));
     return;
   }
 
-  await Session.deleteOne({ _id: sessionId, refreshToken });
+  await Session.deleteOne({
+    _id: sessionId,
+    refreshToken,
+  });
 
   const newSession = await createSession(userId);
 
   setSessionCookies(res, newSession);
 
-  res.status(200).json({ message: 'Session refreshed' });
+  res.status(200).json({
+    message: 'Session refreshed',
+  });
 };
 
-export const requestResetEmail = async (req, res, next) => {
+export const requestResetEmail = async (req, res) => {
   const { email } = req.body;
 
   const user = await User.findOne({ email });
@@ -111,12 +129,19 @@ export const requestResetEmail = async (req, res, next) => {
   }
 
   const resetToken = jwt.sign(
-    { sub: user._id, email },
+    {
+      sub: user._id,
+      email,
+    },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' },
+    {
+      expiresIn: '15m',
+    },
   );
 
-  const templatePath = path.resolve('src/templates/reset-password-email.html');
+  const templatePath = path.resolve(
+    'src/templates/reset-password-email.html',
+  );
 
   const templateSource = await fs.readFile(templatePath, 'utf-8');
 
@@ -132,7 +157,6 @@ export const requestResetEmail = async (req, res, next) => {
       from: process.env.SMTP_FROM,
       to: email,
       subject: 'Reset your password',
-
       html,
     });
   } catch {
@@ -151,21 +175,32 @@ export const resetPassword = async (req, res) => {
   const { token, password } = req.body;
 
   let payload;
+
   try {
     payload = jwt.verify(token, process.env.JWT_SECRET);
   } catch {
     throw createHttpError(401, 'Invalid or expired token');
   }
 
-  const user = await User.findOne({ _id: payload.sub, email: payload.email });
+  const user = await User.findOne({
+    _id: payload.sub,
+    email: payload.email,
+  });
+
   if (!user) {
     throw createHttpError(404, 'User not found');
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  await User.updateOne({ _id: user._id }, { password: hashedPassword });
 
-  await Session.deleteMany({ userId: user._id });
+  await User.updateOne(
+    { _id: user._id },
+    { password: hashedPassword },
+  );
+
+  await Session.deleteMany({
+    userId: user._id,
+  });
 
   res.status(200).json({
     message: 'Password reset successfully',

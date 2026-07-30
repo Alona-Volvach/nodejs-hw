@@ -3,7 +3,7 @@ import { Router } from 'express';
 import {
   registerUserSchema,
   loginUserSchema,
-  requestResetEmailBodySchema,
+  requestResetEmailSchema,
   resetPasswordSchema,
 } from '../validations/authValidation.js';
 import {
@@ -23,7 +23,7 @@ router.post('/refresh', refreshUserSession);
 router.post('/logout', logoutUser);
 router.post(
   '/request-reset-email',
-  celebrate(requestResetEmailBodySchema),
+  celebrate(requestResetEmailSchema),
   requestResetEmail,
 );
 router.post(
